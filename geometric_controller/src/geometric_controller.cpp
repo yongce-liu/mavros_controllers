@@ -305,13 +305,17 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
       double desired_z =
           home_pose_.position.z + takeoff_height_ * takeoff_speed_;
       geometry_msgs::PoseStamped desired_pose;
-      Vector3d desired_position(mavPos_(0), mavPos_(1), desired_z);
+      Vector3d desired_position(home_pose_.position.x, home_pose_.position.y,
+                                desired_z);
       desired_pose = vector3d2PoseStampedMsg(desired_position, mavAtt_);
       target_pose_pub_.publish(desired_pose);
 
       double current_z = mavPos_(2);
       double dz = std::abs(current_z - target_z);
       if (dz < 0.1) {
+        last_hold_pose_ = vector3d2PoseStampedMsg(
+            Vector3d(home_pose_.position.x, home_pose_.position.y, target_z),
+            Vector4d(1, 0, 0, 0));
         node_state = HOLD;
         ROS_INFO("Takeoff complete, switching to HOLD");
       }
@@ -321,14 +325,16 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
     case WAITING_FOR_HOME_POSE: {
       waitForPredicate(&received_home_pose, "Waiting for home pose...");
       ROS_INFO("Got pose! Drone Ready to be armed.");
+      last_hold_pose_ = vector3d2PoseStampedMsg(
+          Vector3d(home_pose_.position.x, home_pose_.position.y,
+                   home_pose_.position.z),
+          Vector4d(1, 0, 0, 0));
       node_state = HOLD;
       break;
     }
 
     case HOLD: {
-      geometry_msgs::PoseStamped holdmsg =
-          vector3d2PoseStampedMsg(mavPos_, mavAtt_);
-      target_pose_pub_.publish(holdmsg);
+      target_pose_pub_.publish(last_hold_pose_);
       break;
     }
 

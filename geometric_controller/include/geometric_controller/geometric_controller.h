@@ -129,6 +129,7 @@ class geometricCtrl {
   double norm_thrust_const_, norm_thrust_offset_, norm_thrust_max_;
   double max_fb_acc_;
   double takeoff_height_ = 1.0, takeoff_speed_ = 1.5;
+  geometry_msgs::PoseStamped last_hold_pose_;
 
   mavros_msgs::State current_state_;
   mavros_msgs::CommandBool arm_cmd_;
