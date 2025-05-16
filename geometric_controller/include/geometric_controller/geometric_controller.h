@@ -172,7 +172,7 @@ class geometricCtrl {
   bool landCallback(std_srvs::SetBool::Request &request,
                     std_srvs::SetBool::Response &response);
   bool takeoffCallback(geometric_controller::Takeoff::Request &request,
-                       std_srvs::SetBool::Response &response);
+                       geometric_controller::Takeoff::Response);
   geometry_msgs::PoseStamped vector3d2PoseStampedMsg(
       Eigen::Vector3d &position, Eigen::Vector4d &orientation);
   void computeBodyRateCmd(Eigen::Vector4d &bodyrate_cmd,

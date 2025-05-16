@@ -262,24 +262,34 @@ void geometricCtrl::mavtwistCallback(const geometry_msgs::TwistStamped &msg) {
 
 bool geometricCtrl::takeoffCallback(
     geometric_controller::Takeoff::Request &request,
-    std_srvs::SetBool::Response &response) {
+    geometric_controller::Takeoff::Response) {
   if (!current_state_.armed) {
     if (arming_client_.call(arm_cmd_) && arm_cmd_.response.success) {
       ROS_INFO("Vehicle armed");
+      response.success = true;  // Set response fields properly
+      response.message = "Vehicle armed";
     } else {
       ROS_WARN("Arming failed");
+      response.success = false;
+      response.message = "Arming failed";
+      return true;  // Return true to indicate service was processed, even if
+                    // failed
     }
   } else {
     ROS_INFO("Already armed");
+    response.success = true;
+    response.message = "Already armed";
   }
-  res.success = true;
-  res.message = "Takeoff started";
-  // takeoff_start_z_ = home_pose_.position.z;
+
+  // Validate and set takeoff parameters
   takeoff_height_ =
       std::min(3.0, std::max(0.3, static_cast<double>(request.height)));
-  takeoff_speed_ = std::max(0, std::min(2.0, static_cast<double>request.speed)));
+  takeoff_speed_ =
+      std::max(0.0, std::min(2.0, static_cast<double>(request.speed)));
+
   node_state = TAKEOFF;
-  return true;
+
+  return true;  // Return true to indicate service was processed successfully
 }
 
 bool geometricCtrl::landCallback(std_srvs::SetBool::Request &request,
