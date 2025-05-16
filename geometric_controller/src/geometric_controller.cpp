@@ -275,8 +275,9 @@ bool geometricCtrl::takeoffCallback(
   res.success = true;
   res.message = "Takeoff started";
   // takeoff_start_z_ = home_pose_.position.z;
-  takeoff_height_ = std::min(3.0, std::max(0.3, request.height));
-  takeoff_speed_ = std::max(0, std::min(2.0, request.speed));
+  takeoff_height_ =
+      std::min(3.0, std::max(0.3, static_cast<double>(request.height)));
+  takeoff_speed_ = std::max(0, std::min(2.0, static_cast<double>request.speed)));
   node_state = TAKEOFF;
   return true;
 }
