@@ -65,8 +65,8 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh, const ros::NodeHandle &n
   ctrltriggerServ_ = nh_.advertiseService("trigger_rlcontroller", &geometricCtrl::ctrltriggerCallback, this);
   cmdloop_timer_ = nh_.createTimer(ros::Duration(0.01), &geometricCtrl::cmdloopCallback,
                                    this);  // Define timer for constant loop rate
-  statusloop_timer_ = nh_.createTimer(ros::Duration(1), &geometricCtrl::statusloopCallback,
-                                      this);  // Define timer for constant loop rate
+  // statusloop_timer_ = nh_.createTimer(ros::Duration(1), &geometricCtrl::statusloopCallback,
+  //                                     this);  // Define timer for constant loop rate
 
   angularVelPub_ = nh_.advertise<mavros_msgs::AttitudeTarget>("command/bodyrate_command", 1);
   referencePosePub_ = nh_.advertise<geometry_msgs::PoseStamped>("reference/pose", 1);
@@ -75,7 +75,10 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh, const ros::NodeHandle &n
   systemstatusPub_ = nh_.advertise<mavros_msgs::CompanionProcessStatus>("mavros/companion_process/status", 1);
   arming_client_ = nh_.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
   set_mode_client_ = nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
+  takeoff_service_ = nh_.advertiseService("takeoff", &geometricCtrl::takeoffCallback, this);
+  takeoff_client_ = nh_.serviceClient<mavros_msgs::CommandTOL>("/mavros/cmd/takeoff");
   land_service_ = nh_.advertiseService("land", &geometricCtrl::landCallback, this);
+  land_client = nh_.serviceClient<mavros_msgs::CommandTOL>("mavros/cmd/land");
 
   nh_private_.param<string>("mavname", mav_name_, "iris");
   nh_private_.param<int>("ctrl_mode", ctrl_mode_, ERROR_QUATERNION);
@@ -225,6 +228,23 @@ void geometricCtrl::mavtwistCallback(const geometry_msgs::TwistStamped &msg) {
   mavRate_ = toEigen(msg.twist.angular);
 }
 
+bool geometricCtrl::takeoffCallback(geometric_controller::Takeoff::Request &request, std_srvs::SetBool::Response &response) {
+  ros::param::set("/mavros/param/MPC_TKO_SPEED", request.speed);
+  mavros_msgs::CommandTOL takeoff_cmd;
+  takeoff_cmd.request.altitude = request.height;
+  takeoff_cmd.request.latitude = NAN;
+  takeoff_cmd.request.longitude = NAN;
+
+  if (takeoff_client_.call(takeoff_cmd)) {
+    // ("Takeoff to %.1fm at %.1fm/s", height, speed);
+    node_state = TAKEOFF;
+    return true;
+  } else {
+    // ROS_INFO("Failed to call takeoff service");
+    return false;
+  }
+}
+
 bool geometricCtrl::landCallback(std_srvs::SetBool::Request &request, std_srvs::SetBool::Response &response) {
   node_state = LANDING;
   return true;
@@ -232,11 +252,16 @@ bool geometricCtrl::landCallback(std_srvs::SetBool::Request &request, std_srvs::
 
 void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
   switch (node_state) {
-    case WAITING_FOR_HOME_POSE:
+    case TAKEOFF:{
+      break;;
+    }
+
+    case WAITING_FOR_HOME_POSE:{
       waitForPredicate(&received_home_pose, "Waiting for home pose...");
       ROS_INFO("Got pose! Drone Ready to be armed.");
       node_state = MISSION_EXECUTION;
       break;
+    }
 
     case MISSION_EXECUTION: {
       Eigen::Vector3d desired_acc;
@@ -254,47 +279,51 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
     }
 
     case LANDING: {
-      geometry_msgs::PoseStamped landingmsg;
-      landingmsg.header.stamp = ros::Time::now();
-      landingmsg.pose = home_pose_;
-      landingmsg.pose.position.z = landingmsg.pose.position.z + 1.0;
-      target_pose_pub_.publish(landingmsg);
-      node_state = LANDED;
+      mavros_msgs::CommandTOL land_cmd;
+      land_cmd.request.altitude = home_pose_.position.z;  // 设置目标高度（通常为0）
+      land_cmd.request.latitude = NAN;  // 使用当前位置
+      land_cmd.request.longitude = NAN;
+      land_cmd.request.min_pitch = 0;
+      land_cmd.request.yaw = 0;
+      
+      if (land_client.call(land_cmd) && land_cmd.response.success) {
+          // node_state = LANDED;
+          ROS_INFO("Landing command accepted");
+          cmdloop_timer_.stop();
+      } else {
+          ROS_ERROR("Landing failed!");
+      }
       ros::spinOnce();
       break;
-    }
-    case LANDED:
-      ROS_INFO("Landed. Please set to position control and disarm.");
-      cmdloop_timer_.stop();
-      break;
+  }
   }
 }
 
 void geometricCtrl::mavstateCallback(const mavros_msgs::State::ConstPtr &msg) { current_state_ = *msg; }
 
-void geometricCtrl::statusloopCallback(const ros::TimerEvent &event) {
-  if (sim_enable_) {
-    // Enable OFFBoard mode and arm automatically
-    // This will only run if the vehicle is simulated
-    mavros_msgs::SetMode offb_set_mode;
-    arm_cmd_.request.value = true;
-    offb_set_mode.request.custom_mode = "OFFBOARD";
-    if (current_state_.mode != "OFFBOARD" && (ros::Time::now() - last_request_ > ros::Duration(5.0))) {
-      if (set_mode_client_.call(offb_set_mode) && offb_set_mode.response.mode_sent) {
-        ROS_INFO("Offboard enabled");
-      }
-      last_request_ = ros::Time::now();
-    } else {
-      if (!current_state_.armed && (ros::Time::now() - last_request_ > ros::Duration(5.0))) {
-        if (arming_client_.call(arm_cmd_) && arm_cmd_.response.success) {
-          ROS_INFO("Vehicle armed");
-        }
-        last_request_ = ros::Time::now();
-      }
-    }
-  }
-  pubSystemStatus();
-}
+// void geometricCtrl::statusloopCallback(const ros::TimerEvent &event) {
+//   if (sim_enable_) {
+//     // Enable OFFBoard mode and arm automatically
+//     // This will only run if the vehicle is simulated
+//     mavros_msgs::SetMode offb_set_mode;
+//     arm_cmd_.request.value = true;
+//     offb_set_mode.request.custom_mode = "OFFBOARD";
+//     if (current_state_.mode != "OFFBOARD" && (ros::Time::now() - last_request_ > ros::Duration(5.0))) {
+//       if (set_mode_client_.call(offb_set_mode) && offb_set_mode.response.mode_sent) {
+//         ROS_INFO("Offboard enabled");
+//       }
+//       last_request_ = ros::Time::now();
+//     } else {
+//       if (!current_state_.armed && (ros::Time::now() - last_request_ > ros::Duration(5.0))) {
+//         if (arming_client_.call(arm_cmd_) && arm_cmd_.response.success) {
+//           ROS_INFO("Vehicle armed");
+//         }
+//         last_request_ = ros::Time::now();
+//       }
+//     }
+//   }
+//   pubSystemStatus();
+// }
 
 void geometricCtrl::pubReferencePose(const Eigen::Vector3d &target_position, const Eigen::Vector4d &target_attitude) {
   geometry_msgs::PoseStamped msg;
