@@ -262,7 +262,7 @@ void geometricCtrl::mavtwistCallback(const geometry_msgs::TwistStamped &msg) {
 
 bool geometricCtrl::takeoffCallback(
     geometric_controller::Takeoff::Request &request,
-    geometric_controller::Takeoff::Response) {
+    geometric_controller::Takeoff::Response &response) {
   if (!current_state_.armed) {
     if (arming_client_.call(arm_cmd_) && arm_cmd_.response.success) {
       ROS_INFO("Vehicle armed");
