@@ -301,7 +301,10 @@ bool geometricCtrl::landCallback(std_srvs::SetBool::Request &request,
 
 void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
   if (current_state_.mode != "OFFBOARD") {
-    ROS_WARN("Not in OFFBOARD mode");
+    if (!offboard_warned_) {
+      ROS_WARN("Not in OFFBOARD mode");
+      offboard_warned_ = true;
+    }
     return;
   }
   switch (node_state) {
