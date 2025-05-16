@@ -315,6 +315,7 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
         node_state = HOLD;
         ROS_INFO("Takeoff complete, switching to HOLD");
       }
+      break;
     }
 
     case WAITING_FOR_HOME_POSE: {
