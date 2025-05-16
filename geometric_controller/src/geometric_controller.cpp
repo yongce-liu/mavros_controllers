@@ -290,18 +290,18 @@ bool geometricCtrl::landCallback(std_srvs::SetBool::Request &request,
 void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
   switch (node_state) {
     case TAKEOFF: {
-      double target_z =
-          home_pose_.position.z + takeoff_height_ double desired_z =
-              home_pose_.position.z + takeoff_height_ * takeoff_speed_;
+      double target_z = home_pose_.position.z + takeoff_height_;
+      double desired_z =
+          home_pose_.position.z + takeoff_height_ * takeoff_speed_;
       geometry_msgs::PoseStamped desired_pose;
-      Eigen::Vector3d desired_position(mavPos_(0), mavPos_(1), desired_z);
+      Vector3d desired_position(mavPos_(0), mavPos_(1), desired_z);
       desired_pose = vector3d2PoseStampedMsg(desired_position, mavAtt_);
-      target_pos_pub_.publish(desired_pose);
+      target_pose_pub_.publish(desired_pose);
 
       double current_z = mavPos_(2);
       double dz = std::abs(current_z - target_z);
       if (dz < 0.1) {
-        state_ = HOLD;
+        node_state = HOLD;
         ROS_INFO("Takeoff complete, switching to HOLD");
       }
     }
