@@ -129,10 +129,7 @@ class geometricCtrl {
   double norm_thrust_const_, norm_thrust_offset_, norm_thrust_max_;
   double max_fb_acc_;
   double takeoff_height_ = 1.0, takeoff_speed_ = 1.5;
-  geometry_msgs::PoseStamped last_hold_pose_ = {
-      .header = {.stamp = ros::Time::now(), .frame_id = "map"},
-      .pose = {.position = {.x = 0.0, .y = 0.0, .z = 0.0},
-               .orientation = {.x = 0.0, .y = 0.0, .z = 0.0, .w = 1.0}}};
+  geometry_msgs::Point last_hold_point_;
 
   mavros_msgs::State current_state_;
   mavros_msgs::CommandBool arm_cmd_;

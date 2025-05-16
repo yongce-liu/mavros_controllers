@@ -313,9 +313,8 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
       double current_z = mavPos_(2);
       double dz = std::abs(current_z - target_z);
       if (dz < 0.1) {
-        last_hold_pose_.position.x = home_pose_.position.x;
-        last_hold_pose_.position.y = home_pose_.position.y;
-        last_hold_pose_.position.z = target_z;
+        last_hold_point_ = home_pose_.position;
+        last_hold_point_.z = target_z;
         node_state = HOLD;
         ROS_INFO("Takeoff complete, switching to HOLD");
       }
@@ -325,14 +324,17 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
     case WAITING_FOR_HOME_POSE: {
       waitForPredicate(&received_home_pose, "Waiting for home pose...");
       ROS_INFO("Got pose! Drone Ready to be armed.");
-      last_hold_pose_.position = home_pose_.position;
+      last_hold_point_ = home_pose_.position;
       node_state = HOLD;
       break;
     }
 
     case HOLD: {
-      last_hold_pose_.header.stamp = ros::Time::now();
-      target_pose_pub_.publish(last_hold_pose_);
+      geometry_msgs::PoseStamped hold_pose;
+      hold_pose.header.stamp = ros::Time::now();
+      hold_pose.header.frame_id = "map";
+      hold_pose.pose.position = last_hold_point_;
+      target_pose_pub_.publish(hold_pose);
       break;
     }
 
