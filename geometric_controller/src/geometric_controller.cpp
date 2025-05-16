@@ -263,6 +263,7 @@ void geometricCtrl::mavtwistCallback(const geometry_msgs::TwistStamped &msg) {
 bool geometricCtrl::takeoffCallback(
     geometric_controller::Takeoff::Request &request,
     geometric_controller::Takeoff::Response &response) {
+  arm_cmd_.request.value = true;
   if (!current_state_.armed) {
     if (arming_client_.call(arm_cmd_) && arm_cmd_.response.success) {
       ROS_INFO("Vehicle armed");
@@ -299,6 +300,10 @@ bool geometricCtrl::landCallback(std_srvs::SetBool::Request &request,
 }
 
 void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
+  if (current_state_.mode != "OFFBOARD") {
+    ROS_WARN("Not in OFFBOARD mode");
+    return;
+  }
   switch (node_state) {
     case TAKEOFF: {
       double target_z = home_pose_.position.z + takeoff_height_;
