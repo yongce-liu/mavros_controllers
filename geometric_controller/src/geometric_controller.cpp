@@ -74,7 +74,7 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh, const ros::NodeHandle &n
   posehistoryPub_ = nh_.advertise<nav_msgs::Path>("geometric_controller/path", 10);
   systemstatusPub_ = nh_.advertise<mavros_msgs::CompanionProcessStatus>("mavros/companion_process/status", 1);
   arming_client_ = nh_.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
-  set_mode_client_ = nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
+  // set_mode_client_ = nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
   takeoff_service_ = nh_.advertiseService("takeoff", &geometricCtrl::takeoffCallback, this);
   takeoff_client_ = nh_.serviceClient<mavros_msgs::CommandTOL>("/mavros/cmd/takeoff");
   land_service_ = nh_.advertiseService("land", &geometricCtrl::landCallback, this);
@@ -82,7 +82,7 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh, const ros::NodeHandle &n
 
   nh_private_.param<string>("mavname", mav_name_, "iris");
   nh_private_.param<int>("ctrl_mode", ctrl_mode_, ERROR_QUATERNION);
-  nh_private_.param<bool>("enable_sim", sim_enable_, true);
+  // nh_private_.param<bool>("enable_sim", sim_enable_, true);
   nh_private_.param<bool>("velocity_yaw", velocity_yaw_, false);
   nh_private_.param<double>("max_acc", max_fb_acc_, 9.0);
   nh_private_.param<double>("yaw_heading", mavYaw_, 0.0);
@@ -253,13 +253,17 @@ bool geometricCtrl::landCallback(std_srvs::SetBool::Request &request, std_srvs::
 void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
   switch (node_state) {
     case TAKEOFF:{
-      break;;
+      break;
     }
 
-    case WAITING_FOR_HOME_POSE:{
-      waitForPredicate(&received_home_pose, "Waiting for home pose...");
-      ROS_INFO("Got pose! Drone Ready to be armed.");
-      node_state = MISSION_EXECUTION;
+    // case WAITING_FOR_HOME_POSE:{
+    //   waitForPredicate(&received_home_pose, "Waiting for home pose...");
+    //   ROS_INFO("Got pose! Drone Ready to be armed.");
+    //   node_state = MISSION_EXECUTION;
+    //   break;
+    // }
+
+    case HOLD:{
       break;
     }
 

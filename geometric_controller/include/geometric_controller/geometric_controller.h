@@ -175,7 +175,7 @@ class geometricCtrl {
   Eigen::Vector4d attcontroller(const Eigen::Vector4d &ref_att, const Eigen::Vector3d &ref_acc,
                                 Eigen::Vector4d &curr_att);
 
-  enum FlightState { TAKEOFF, WAITING_FOR_HOME_POSE, MISSION_EXECUTION, LANDING } node_state;
+  enum FlightState { TAKEOFF, HOLD, MISSION_EXECUTION, LANDING } node_state;
 
   template <class T>
   void waitForPredicate(const T *pred, const std::string &msg, double hz = 2.0) {
