@@ -122,7 +122,6 @@ class geometricCtrl {
   bool ctrl_enable_{true};
   int ctrl_mode_;
   bool landing_commanded_{false};
-  bool offboard_warned_{false};
   // bool sim_enable_;
   bool velocity_yaw_;
   double kp_rot_, kd_rot_;

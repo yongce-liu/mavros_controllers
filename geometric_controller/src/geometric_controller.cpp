@@ -76,10 +76,9 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh,
   cmdloop_timer_ =
       nh_.createTimer(ros::Duration(0.01), &geometricCtrl::cmdloopCallback,
                       this);  // Define timer for constant loop rate
-  // statusloop_timer_ = nh_.createTimer(ros::Duration(1),
-  // &geometricCtrl::statusloopCallback,
-  //                                     this);  // Define timer for constant
-  //                                     loop rate
+  statusloop_timer_ =
+      nh_.createTimer(ros::Duration(1), &geometricCtrl::statusloopCallback,
+                      this);  // Define timer for constant loop rate
 
   angularVelPub_ =
       nh_.advertise<mavros_msgs::AttitudeTarget>("command/bodyrate_command", 1);
@@ -300,13 +299,6 @@ bool geometricCtrl::landCallback(std_srvs::SetBool::Request &request,
 }
 
 void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
-  if (current_state_.mode != "OFFBOARD") {
-    if (!offboard_warned_) {
-      ROS_WARN("Not in OFFBOARD mode");
-      offboard_warned_ = true;
-    }
-    return;
-  }
   switch (node_state) {
     case TAKEOFF: {
       double target_z = home_pose_.position.z + takeoff_height_;
@@ -378,32 +370,36 @@ void geometricCtrl::mavstateCallback(const mavros_msgs::State::ConstPtr &msg) {
   current_state_ = *msg;
 }
 
-// void geometricCtrl::statusloopCallback(const ros::TimerEvent &event) {
-//   if (sim_enable_) {
-//     // Enable OFFBoard mode and arm automatically
-//     // This will only run if the vehicle is simulated
-//     mavros_msgs::SetMode offb_set_mode;
-//     arm_cmd_.request.value = true;
-//     offb_set_mode.request.custom_mode = "OFFBOARD";
-//     if (current_state_.mode != "OFFBOARD" && (ros::Time::now() -
-//     last_request_ > ros::Duration(5.0))) {
-//       if (set_mode_client_.call(offb_set_mode) &&
-//       offb_set_mode.response.mode_sent) {
-//         ROS_INFO("Offboard enabled");
-//       }
-//       last_request_ = ros::Time::now();
-//     } else {
-//       if (!current_state_.armed && (ros::Time::now() - last_request_ >
-//       ros::Duration(5.0))) {
-//         if (arming_client_.call(arm_cmd_) && arm_cmd_.response.success) {
-//           ROS_INFO("Vehicle armed");
-//         }
-//         last_request_ = ros::Time::now();
-//       }
-//     }
-//   }
-//   pubSystemStatus();
-// }
+void geometricCtrl::statusloopCallback(const ros::TimerEvent &event) {
+  // if (sim_enable_) {
+  //   // Enable OFFBoard mode and arm automatically
+  //   // This will only run if the vehicle is simulated
+  //   mavros_msgs::SetMode offb_set_mode;
+  //   arm_cmd_.request.value = true;
+  //   offb_set_mode.request.custom_mode = "OFFBOARD";
+  //   if (current_state_.mode != "OFFBOARD" &&
+  //       (ros::Time::now() - last_request_ > ros::Duration(5.0))) {
+  //     if (set_mode_client_.call(offb_set_mode) &&
+  //         offb_set_mode.response.mode_sent) {
+  //       ROS_INFO("Offboard enabled");
+  //     }
+  //     last_request_ = ros::Time::now();
+  //   } else {
+  //     if (!current_state_.armed &&
+  //         (ros::Time::now() - last_request_ > ros::Duration(5.0))) {
+  //       if (arming_client_.call(arm_cmd_) && arm_cmd_.response.success) {
+  //         ROS_INFO("Vehicle armed");
+  //       }
+  //       last_request_ = ros::Time::now();
+  //     }
+  //   }
+  // }
+  if (current_state_.mode != "OFFBOARD") {
+    ROS_WARN("Not in OFFBOARD mode");
+    return;
+  }
+  pubSystemStatus();
+}
 
 void geometricCtrl::pubReferencePose(const Eigen::Vector3d &target_position,
                                      const Eigen::Vector4d &target_attitude) {
