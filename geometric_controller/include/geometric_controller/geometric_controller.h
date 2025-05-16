@@ -41,44 +41,42 @@
 #ifndef GEOMETRIC_CONTROLLER_H
 #define GEOMETRIC_CONTROLLER_H
 
-#include <ros/ros.h>
-#include <ros/subscribe_options.h>
-#include <tf/transform_broadcaster.h>
-
-#include <stdio.h>
-#include <cstdlib>
-#include <sstream>
-#include <string>
-
+#include <controller_msgs/FlatTarget.h>
+#include <dynamic_reconfigure/server.h>
+#include <geometric_controller/GeometricControllerConfig.h>
+#include <geometric_controller/Takeoff.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/CommandBool.h>
+#include <mavros_msgs/CommandTOL.h>
 #include <mavros_msgs/CompanionProcessStatus.h>
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/State.h>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
+#include <ros/ros.h>
+#include <ros/subscribe_options.h>
 #include <std_msgs/Float32.h>
-#include <Eigen/Dense>
-
-#include <controller_msgs/FlatTarget.h>
-#include <dynamic_reconfigure/server.h>
-#include <geometric_controller/GeometricControllerConfig.h>
 #include <std_srvs/SetBool.h>
+#include <stdio.h>
+#include <tf/transform_broadcaster.h>
 #include <trajectory_msgs/MultiDOFJointTrajectory.h>
 #include <trajectory_msgs/MultiDOFJointTrajectoryPoint.h>
+
+#include <Eigen/Dense>
+#include <cstdlib>
+#include <sstream>
+#include <string>
 
 #include "geometric_controller/common.h"
 #include "geometric_controller/control.h"
 
-#include <geometric_controller/Takeoff.h> 
-#include <mavros_msgs/CommandTOL.h>
-#include <mavros_msgs/CommandBool.h>
-
+#define ERROR_POSITION 0
 #define ERROR_QUATERNION 1
 #define ERROR_GEOMETRIC 2
+#define ERROR_JERK 3
 
 using namespace std;
 using namespace Eigen;
@@ -124,12 +122,13 @@ class geometricCtrl {
   bool ctrl_enable_{true};
   int ctrl_mode_;
   bool landing_commanded_{false};
-  bool sim_enable_;
+  // bool sim_enable_;
   bool velocity_yaw_;
   double kp_rot_, kd_rot_;
   double reference_request_dt_;
-  double norm_thrust_const_, norm_thrust_offset_;
+  double norm_thrust_const_, norm_thrust_offset_, norm_thrust_max_;
   double max_fb_acc_;
+  double takeoff_height_ = 1.0, takeoff_speed_ = 1.5;
 
   mavros_msgs::State current_state_;
   mavros_msgs::CommandBool arm_cmd_;
@@ -137,7 +136,8 @@ class geometricCtrl {
   MAV_STATE companion_state_ = MAV_STATE::MAV_STATE_ACTIVE;
 
   double initTargetPos_x_, initTargetPos_y_, initTargetPos_z_;
-  Eigen::Vector3d targetPos_, targetVel_, targetAcc_, targetJerk_, targetSnap_, targetPos_prev_, targetVel_prev_;
+  Eigen::Vector3d targetPos_, targetVel_, targetAcc_, targetJerk_, targetSnap_,
+      targetPos_prev_, targetVel_prev_;
   Eigen::Vector3d mavPos_, mavVel_, mavRate_;
   double mavYaw_;
   Eigen::Vector3d gravity_{Eigen::Vector3d(0.0, 0.0, -9.8)};
@@ -148,8 +148,10 @@ class geometricCtrl {
   int posehistory_window_;
 
   void pubMotorCommands();
-  void pubRateCommands(const Eigen::Vector4d &cmd, const Eigen::Vector4d &target_attitude);
-  void pubReferencePose(const Eigen::Vector3d &target_position, const Eigen::Vector4d &target_attitude);
+  void pubRateCommands(const Eigen::Vector4d &cmd,
+                       const Eigen::Vector4d &target_attitude);
+  void pubReferencePose(const Eigen::Vector3d &target_position,
+                        const Eigen::Vector4d &target_attitude);
   void pubPoseHistory();
   void pubSystemStatus();
   void appendPoseHistory();
@@ -157,28 +159,44 @@ class geometricCtrl {
   void targetCallback(const geometry_msgs::TwistStamped &msg);
   void flattargetCallback(const controller_msgs::FlatTarget &msg);
   void yawtargetCallback(const std_msgs::Float32 &msg);
-  void multiDOFJointCallback(const trajectory_msgs::MultiDOFJointTrajectory &msg);
+  void multiDOFJointCallback(
+      const trajectory_msgs::MultiDOFJointTrajectory &msg);
   void keyboardCallback(const geometry_msgs::Twist &msg);
   void cmdloopCallback(const ros::TimerEvent &event);
   void mavstateCallback(const mavros_msgs::State::ConstPtr &msg);
   void mavposeCallback(const geometry_msgs::PoseStamped &msg);
   void mavtwistCallback(const geometry_msgs::TwistStamped &msg);
   void statusloopCallback(const ros::TimerEvent &event);
-  bool ctrltriggerCallback(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
-  bool landCallback(std_srvs::SetBool::Request &request, std_srvs::SetBool::Response &response);
-  bool takeoffCallback(geometric_controller::Takeoff::Request &request, std_srvs::SetBool::Response &response);
-  geometry_msgs::PoseStamped vector3d2PoseStampedMsg(Eigen::Vector3d &position, Eigen::Vector4d &orientation);
-  void computeBodyRateCmd(Eigen::Vector4d &bodyrate_cmd, const Eigen::Vector3d &target_acc);
-  Eigen::Vector3d controlPosition(const Eigen::Vector3d &target_pos, const Eigen::Vector3d &target_vel,
+  bool ctrltriggerCallback(std_srvs::SetBool::Request &req,
+                           std_srvs::SetBool::Response &res);
+  bool landCallback(std_srvs::SetBool::Request &request,
+                    std_srvs::SetBool::Response &response);
+  bool takeoffCallback(geometric_controller::Takeoff::Request &request,
+                       std_srvs::SetBool::Response &response);
+  geometry_msgs::PoseStamped vector3d2PoseStampedMsg(
+      Eigen::Vector3d &position, Eigen::Vector4d &orientation);
+  void computeBodyRateCmd(Eigen::Vector4d &bodyrate_cmd,
+                          const Eigen::Vector3d &target_acc);
+  Eigen::Vector3d controlPosition(const Eigen::Vector3d &target_pos,
+                                  const Eigen::Vector3d &target_vel,
                                   const Eigen::Vector3d &target_acc);
-  Eigen::Vector3d poscontroller(const Eigen::Vector3d &pos_error, const Eigen::Vector3d &vel_error);
-  Eigen::Vector4d attcontroller(const Eigen::Vector4d &ref_att, const Eigen::Vector3d &ref_acc,
+  Eigen::Vector3d poscontroller(const Eigen::Vector3d &pos_error,
+                                const Eigen::Vector3d &vel_error);
+  Eigen::Vector4d attcontroller(const Eigen::Vector4d &ref_att,
+                                const Eigen::Vector3d &ref_acc,
                                 Eigen::Vector4d &curr_att);
 
-  enum FlightState { TAKEOFF, HOLD, MISSION_EXECUTION, LANDING } node_state;
+  enum FlightState {
+    TAKEOFF,
+    WAITING_FOR_HOME_POSE,
+    HOLD,
+    MISSION_EXECUTION,
+    LANDING
+  } node_state;
 
   template <class T>
-  void waitForPredicate(const T *pred, const std::string &msg, double hz = 2.0) {
+  void waitForPredicate(const T *pred, const std::string &msg,
+                        double hz = 2.0) {
     ros::Rate pause(hz);
     ROS_INFO_STREAM(msg);
     while (ros::ok() && !(*pred)) {
@@ -191,10 +209,12 @@ class geometricCtrl {
   std::shared_ptr<Control> controller_;
 
  public:
-  void dynamicReconfigureCallback(geometric_controller::GeometricControllerConfig &config, uint32_t level);
+  void dynamicReconfigureCallback(
+      geometric_controller::GeometricControllerConfig &config, uint32_t level);
   geometricCtrl(const ros::NodeHandle &nh, const ros::NodeHandle &nh_private);
   virtual ~geometricCtrl();
-  void getStates(Eigen::Vector3d &pos, Eigen::Vector4d &att, Eigen::Vector3d &vel, Eigen::Vector3d &angvel) {
+  void getStates(Eigen::Vector3d &pos, Eigen::Vector4d &att,
+                 Eigen::Vector3d &vel, Eigen::Vector3d &angvel) {
     pos = mavPos_;
     att = mavAtt_;
     vel = mavVel_;
@@ -204,11 +224,20 @@ class geometricCtrl {
     pos = mavPos_ - targetPos_;
     vel = mavVel_ - targetVel_;
   };
-  void setBodyRateCommand(Eigen::Vector4d bodyrate_command) { cmdBodyRate_ = bodyrate_command; };
-  void setFeedthrough(bool feed_through) { feedthrough_enable_ = feed_through; };
-  void setDesiredAcceleration(Eigen::Vector3d &acceleration) { targetAcc_ = acceleration; };
-  static Eigen::Vector4d acc2quaternion(const Eigen::Vector3d &vector_acc, const double &yaw);
-  static double getVelocityYaw(const Eigen::Vector3d velocity) { return atan2(velocity(1), velocity(0)); };
+  void setBodyRateCommand(Eigen::Vector4d bodyrate_command) {
+    cmdBodyRate_ = bodyrate_command;
+  };
+  void setFeedthrough(bool feed_through) {
+    feedthrough_enable_ = feed_through;
+  };
+  void setDesiredAcceleration(Eigen::Vector3d &acceleration) {
+    targetAcc_ = acceleration;
+  };
+  static Eigen::Vector4d acc2quaternion(const Eigen::Vector3d &vector_acc,
+                                        const double &yaw);
+  static double getVelocityYaw(const Eigen::Vector3d velocity) {
+    return atan2(velocity(1), velocity(0));
+  };
 };
 
 #endif
