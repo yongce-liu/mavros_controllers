@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   mavros_msgs
   mavlink
   message_generation 
+  controller_msgs
 )
 
 generate_dynamic_reconfigure_options(
@@ -22,6 +23,7 @@ generate_dynamic_reconfigure_options(
 add_service_files(
   FILES
   Takeoff.srv
+  Land.srv
 )
 
 generate_messages(

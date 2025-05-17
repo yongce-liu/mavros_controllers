@@ -44,6 +44,7 @@
 #include <controller_msgs/FlatTarget.h>
 #include <dynamic_reconfigure/server.h>
 #include <geometric_controller/GeometricControllerConfig.h>
+#include <geometric_controller/Land.h>
 #include <geometric_controller/Takeoff.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
@@ -111,7 +112,7 @@ class geometricCtrl {
   ros::ServiceClient arming_client_;
   ros::ServiceClient set_mode_client_;
   ros::ServiceServer ctrltriggerServ_;
-  ros::ServiceServer takeoff_service_, land_service_;
+  ros::ServiceServer takeoff_service_, land_service_, mission_service_;
   ros::ServiceClient takeoff_client_, land_client;
   ros::Timer cmdloop_timer_, statusloop_timer_;
   ros::Time last_request_, reference_request_now_, reference_request_last_;
@@ -128,7 +129,8 @@ class geometricCtrl {
   double reference_request_dt_;
   double norm_thrust_const_, norm_thrust_offset_, norm_thrust_max_;
   double max_fb_acc_;
-  double takeoff_height_ = 1.0, takeoff_speed_ = 1.5;
+  double takeoff_height_ = 1.0;
+  double land_height_ = 0.2;
   geometry_msgs::Point last_hold_point_;
 
   mavros_msgs::State current_state_;
@@ -170,10 +172,14 @@ class geometricCtrl {
   void statusloopCallback(const ros::TimerEvent &event);
   bool ctrltriggerCallback(std_srvs::SetBool::Request &req,
                            std_srvs::SetBool::Response &res);
+  // bool landCallback(geometric_controller::Takeoff::Request &request,
+  //                   geometric_controller::Takeoff::Response &response);
   bool landCallback(std_srvs::SetBool::Request &request,
                     std_srvs::SetBool::Response &response);
   bool takeoffCallback(geometric_controller::Takeoff::Request &request,
                        geometric_controller::Takeoff::Response &response);
+  bool missionCallback(std_srvs::SetBool::Request &request,
+                       std_srvs::SetBool::Response &response);
   geometry_msgs::PoseStamped vector3d2PoseStampedMsg(
       Eigen::Vector3d &position, Eigen::Vector4d &orientation);
   void computeBodyRateCmd(Eigen::Vector4d &bodyrate_cmd,
@@ -206,7 +212,7 @@ class geometricCtrl {
     }
   };
   geometry_msgs::Pose home_pose_;
-  bool received_home_pose;
+  bool received_home_pose{false}, received_target_pose{false};
   std::shared_ptr<Control> controller_;
 
  public:

@@ -96,11 +96,14 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh,
   // nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
   takeoff_service_ =
       nh_.advertiseService("takeoff", &geometricCtrl::takeoffCallback, this);
-  takeoff_client_ =
-      nh_.serviceClient<mavros_msgs::CommandTOL>("/mavros/cmd/takeoff");
+  // takeoff_client_ =
+  // nh_.serviceClient<mavros_msgs::CommandTOL>("/mavros/cmd/takeoff");
   land_service_ =
       nh_.advertiseService("land", &geometricCtrl::landCallback, this);
   land_client = nh_.serviceClient<mavros_msgs::CommandTOL>("mavros/cmd/land");
+
+  mission_service_ =
+      nh_.advertiseService("mission", &geometricCtrl::missionCallback, this);
 
   nh_private_.param<string>("mavname", mav_name_, "iris");
   nh_private_.param<int>("ctrl_mode", ctrl_mode_, ERROR_QUATERNION);
@@ -188,17 +191,14 @@ void geometricCtrl::flattargetCallback(const controller_msgs::FlatTarget &msg) {
     targetAcc_ = toEigen(msg.acceleration);
     targetJerk_ = toEigen(msg.jerk);
     targetSnap_ = Eigen::Vector3d::Zero();
-
   } else if (msg.type_mask == 2) {
     targetAcc_ = toEigen(msg.acceleration);
     targetJerk_ = Eigen::Vector3d::Zero();
     targetSnap_ = Eigen::Vector3d::Zero();
-
   } else if (msg.type_mask == 4) {
     targetAcc_ = Eigen::Vector3d::Zero();
     targetJerk_ = Eigen::Vector3d::Zero();
     targetSnap_ = Eigen::Vector3d::Zero();
-
   } else {
     targetAcc_ = toEigen(msg.acceleration);
     targetJerk_ = toEigen(msg.jerk);
@@ -212,6 +212,7 @@ void geometricCtrl::yawtargetCallback(const std_msgs::Float32 &msg) {
 
 void geometricCtrl::multiDOFJointCallback(
     const trajectory_msgs::MultiDOFJointTrajectory &msg) {
+  received_target_pose = true;
   trajectory_msgs::MultiDOFJointTrajectoryPoint pt = msg.points[0];
   reference_request_last_ = reference_request_now_;
 
@@ -283,36 +284,67 @@ bool geometricCtrl::takeoffCallback(
 
   // Validate and set takeoff parameters
   takeoff_height_ =
-      std::min(3.0, std::max(0.3, static_cast<double>(request.height)));
-  takeoff_speed_ =
-      std::max(0.0, std::min(2.0, static_cast<double>(request.speed)));
+      std::max(0.5, std::min(3.0, static_cast<double>(request.height)));
 
   node_state = TAKEOFF;
 
   return true;  // Return true to indicate service was processed successfully
 }
 
+/*
+bool geometricCtrl::landCallback(
+    geometric_controller::Takeoff::Request &request,
+    geometric_controller::Takeoff::Response &response) {
+  land_height_ =
+      std::max(0.05, std::min(0.3, static_cast<double>(request.height)));
+  last_hold_point_.x = mavPos_(0);
+  last_hold_point_.y = mavPos_(1);
+  last_hold_point_.z = mavPos_(2);
+  node_state = LANDING;
+  response.success = true;
+  response.message = "Landing initiated";
+  return true;
+}
+*/
+
 bool geometricCtrl::landCallback(std_srvs::SetBool::Request &request,
                                  std_srvs::SetBool::Response &response) {
   node_state = LANDING;
+  response.success = true;
+  response.message = "AUTO LANDING INITIALIZE";
   return true;
+}
+
+bool geometricCtrl::missionCallback(std_srvs::SetBool::Request &request,
+                                    std_srvs::SetBool::Response &response) {
+  if (!received_target_pose) {
+    ROS_ERROR("No target pose received yet");
+    response.success = false;
+    response.message = "No target pose received yet";
+    return true;
+  }
+
+  else {
+    node_state = MISSION_EXECUTION;
+    response.success = true;
+    response.message = "Mission execution started";
+    return true;
+  }
 }
 
 void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
   switch (node_state) {
     case TAKEOFF: {
       double target_z = home_pose_.position.z + takeoff_height_;
-      double desired_z =
-          home_pose_.position.z + takeoff_height_ * takeoff_speed_;
       geometry_msgs::PoseStamped desired_pose;
       Vector3d desired_position(home_pose_.position.x, home_pose_.position.y,
-                                desired_z);
+                                target_z);
       desired_pose = vector3d2PoseStampedMsg(desired_position, mavAtt_);
       target_pose_pub_.publish(desired_pose);
 
       double current_z = mavPos_(2);
       double dz = std::abs(current_z - target_z);
-      if (dz < 0.1) {
+      if (dz < 0.05) {
         last_hold_point_ = home_pose_.position;
         last_hold_point_.z = target_z;
         node_state = HOLD;
@@ -339,37 +371,67 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
     }
 
     case MISSION_EXECUTION: {
-      Eigen::Vector3d desired_acc;
-      if (feedthrough_enable_) {
-        desired_acc = targetAcc_;
+      Eigen::Vector3d pos_error = mavPos_ - targetPos_;
+      if (pos_error.norm() > 1.0) {
+        geometry_msgs::PoseStamped hold_pose;
+        hold_pose.header.stamp = ros::Time::now();
+        hold_pose.header.frame_id = "map";
+        hold_pose.pose.position = last_hold_point_;
+        target_pose_pub_.publish(hold_pose);
+        ROS_WARN("Target position too far, holding at last position");
       } else {
-        desired_acc = controlPosition(targetPos_, targetVel_, targetAcc_);
+        Eigen::Vector3d desired_acc;
+        if (feedthrough_enable_) {
+          desired_acc = targetAcc_;
+        } else {
+          desired_acc = controlPosition(targetPos_, targetVel_, targetAcc_);
+        }
+        computeBodyRateCmd(cmdBodyRate_, desired_acc);
+        pubReferencePose(targetPos_, q_des);
+        pubRateCommands(cmdBodyRate_, q_des);
+        appendPoseHistory();
+        pubPoseHistory();
       }
-      computeBodyRateCmd(cmdBodyRate_, desired_acc);
-      pubReferencePose(targetPos_, q_des);
-      pubRateCommands(cmdBodyRate_, q_des);
-      appendPoseHistory();
-      pubPoseHistory();
       break;
     }
 
     case LANDING: {
       mavros_msgs::CommandTOL land_cmd;
-      land_cmd.request.altitude = home_pose_.position.z;
-      land_cmd.request.latitude = NAN;
-      land_cmd.request.longitude = NAN;
-      land_cmd.request.min_pitch = 0;
-      land_cmd.request.yaw = 0;
-
       if (land_client.call(land_cmd) && land_cmd.response.success) {
-        ROS_INFO("Landing command accepted");
+        ROS_INFO("Landing command accepted by FCU");
         cmdloop_timer_.stop();
+        statusloop_timer_.stop();
       } else {
-        ROS_ERROR("Landing failed!");
+        ROS_WARN("Landing command failed or was rejected");
       }
-      ros::spinOnce();
       break;
     }
+      /*
+      case LANDING: {
+        double target_z = land_height_;
+        last_hold_point_.z = target_z;
+
+        geometry_msgs::PoseStamped land_pose;
+        land_pose.header.stamp = ros::Time::now();
+        land_pose.header.frame_id = "map";
+        land_pose.pose.position = last_hold_point_;
+        target_pose_pub_.publish(land_pose);
+
+        double current_z = mavPos_(2);
+        double dz = std::abs(current_z - target_z);
+        if (dz < 0.05 && current_state_.) {
+          ROS_INFO("Landing complete, disarming");
+          arm_cmd_.request.value = false;
+          if (arming_client_.call(arm_cmd_) && arm_cmd_.response.success) {
+            ROS_INFO("Vehicle disarmed");
+            cmdloop_timer_.stop();
+          } else {
+            ROS_WARN("Disarming failed");
+          }
+        }
+        break;
+      }
+        */
   }
 }
 
@@ -378,29 +440,31 @@ void geometricCtrl::mavstateCallback(const mavros_msgs::State::ConstPtr &msg) {
 }
 
 void geometricCtrl::statusloopCallback(const ros::TimerEvent &event) {
-  // if (sim_enable_) {
-  //   // Enable OFFBoard mode and arm automatically
-  //   // This will only run if the vehicle is simulated
-  //   mavros_msgs::SetMode offb_set_mode;
-  //   arm_cmd_.request.value = true;
-  //   offb_set_mode.request.custom_mode = "OFFBOARD";
-  //   if (current_state_.mode != "OFFBOARD" &&
-  //       (ros::Time::now() - last_request_ > ros::Duration(5.0))) {
-  //     if (set_mode_client_.call(offb_set_mode) &&
-  //         offb_set_mode.response.mode_sent) {
-  //       ROS_INFO("Offboard enabled");
-  //     }
-  //     last_request_ = ros::Time::now();
-  //   } else {
-  //     if (!current_state_.armed &&
-  //         (ros::Time::now() - last_request_ > ros::Duration(5.0))) {
-  //       if (arming_client_.call(arm_cmd_) && arm_cmd_.response.success) {
-  //         ROS_INFO("Vehicle armed");
-  //       }
-  //       last_request_ = ros::Time::now();
-  //     }
-  //   }
-  // }
+  /*
+  if (sim_enable_) {
+    // Enable OFFBoard mode and arm automatically
+    // This will only run if the vehicle is simulated
+    mavros_msgs::SetMode offb_set_mode;
+    arm_cmd_.request.value = true;
+    offb_set_mode.request.custom_mode = "OFFBOARD";
+    if (current_state_.mode != "OFFBOARD" &&
+        (ros::Time::now() - last_request_ > ros::Duration(5.0))) {
+      if (set_mode_client_.call(offb_set_mode) &&
+          offb_set_mode.response.mode_sent) {
+        ROS_INFO("Offboard enabled");
+      }
+      last_request_ = ros::Time::now();
+    } else {
+      if (!current_state_.armed &&
+          (ros::Time::now() - last_request_ > ros::Duration(5.0))) {
+        if (arming_client_.call(arm_cmd_) && arm_cmd_.response.success) {
+          ROS_INFO("Vehicle armed");
+        }
+        last_request_ = ros::Time::now();
+      }
+    }
+  }
+  */
   if (current_state_.mode != "OFFBOARD") {
     ROS_WARN("Not in OFFBOARD mode");
     return;
