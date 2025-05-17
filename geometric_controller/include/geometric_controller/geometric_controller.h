@@ -112,7 +112,8 @@ class geometricCtrl {
   ros::ServiceClient arming_client_;
   ros::ServiceClient set_mode_client_;
   ros::ServiceServer ctrltriggerServ_;
-  ros::ServiceServer takeoff_service_, land_service_, mission_service_;
+  ros::ServiceServer takeoff_service_, land_service_, mission_service_,
+      goto_service_;
   ros::ServiceClient takeoff_client_, land_client;
   ros::Timer cmdloop_timer_, statusloop_timer_;
   ros::Time last_request_, reference_request_now_, reference_request_last_;
@@ -180,6 +181,8 @@ class geometricCtrl {
                        geometric_controller::Takeoff::Response &response);
   bool missionCallback(std_srvs::SetBool::Request &request,
                        std_srvs::SetBool::Response &response);
+  bool gotoCallback(std_srvs::SetBool::Request &request,
+                    std_srvs::SetBool::Response &response);
   geometry_msgs::PoseStamped vector3d2PoseStampedMsg(
       Eigen::Vector3d &position, Eigen::Vector4d &orientation);
   void computeBodyRateCmd(Eigen::Vector4d &bodyrate_cmd,
@@ -197,6 +200,7 @@ class geometricCtrl {
     TAKEOFF,
     WAITING_FOR_HOME_POSE,
     HOLD,
+    GOTO,
     MISSION_EXECUTION,
     LANDING
   } node_state;

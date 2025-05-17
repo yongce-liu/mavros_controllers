@@ -104,6 +104,8 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh,
 
   mission_service_ =
       nh_.advertiseService("mission", &geometricCtrl::missionCallback, this);
+  goto_service_ =
+      nh_.advertiseService("goto", &geometricCtrl::gotoCallback, this);
 
   nh_private_.param<string>("mavname", mav_name_, "iris");
   nh_private_.param<int>("ctrl_mode", ctrl_mode_, ERROR_QUATERNION);
@@ -333,6 +335,23 @@ bool geometricCtrl::missionCallback(std_srvs::SetBool::Request &request,
   }
 }
 
+bool geometricCtrl::gotoCallback(std_srvs::SetBool::Request &request,
+                                 std_srvs::SetBool::Response &response) {
+  if (!received_target_pose) {
+    ROS_ERROR("No target pose received yet");
+    response.success = false;
+    response.message = "No target pose received yet";
+    return true;
+  }
+
+  else {
+    node_state = GOTO;
+    response.success = true;
+    response.message = "GOTO execution started";
+    return true;
+  }
+}
+
 void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
   switch (node_state) {
     case TAKEOFF: {
@@ -368,6 +387,17 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
       hold_pose.header.frame_id = "map";
       hold_pose.pose.position = last_hold_point_;
       target_pose_pub_.publish(hold_pose);
+      break;
+    }
+
+    case GOTO: {
+      geometry_msgs::PoseStamped goto_pose;
+      goto_pose.header.stamp = ros::Time::now();
+      goto_pose.header.frame_id = "map";
+      goto_pose.pose.position.x = targetPos_(0);
+      goto_pose.pose.position.y = targetPos_(1);
+      goto_pose.pose.position.z = targetPos_(2);
+      target_pose_pub_.publish(goto_pose);
       break;
     }
 

@@ -4,7 +4,7 @@
   <arg name="gcs_url" default="" />
   <arg name="tgt_system" default="1" />
   <arg name="tgt_component" default="1" />
-  <arg name="command_input" default="2" />
+  <arg name="command_input" default="1" />
   <arg name="gazebo_simulation" default="true" />
   <arg name="visualization" default="true"/>
   <arg name="log_output" default="screen" />
@@ -17,7 +17,7 @@
           <param name="ctrl_mode" value="$(arg command_input)" />
           <param name="enable_sim" value="$(arg gazebo_simulation)" />
           <param name="enable_gazebo_state" value="true"/>
-          <param name="max_acc" value="10.0" />
+          <param name="max_acc" value="4.0" />
           <!--Params specific for Iris copter-->
           <param name="attctrl_constant" value="0.3"/>
           <param name="normalizedthrust_constant" value="0.06"/>
@@ -33,7 +33,7 @@
   <node pkg="trajectory_publisher" type="trajectory_publisher" name="trajectory_publisher" output="screen">
         <param name="trajectory_type" value="1" />
         <param name="shape_omega" value="0.5" />
-        <param name="initpos_z" value="2.0" />
+        <param name="initpos_z" value="1.0" />
         <param name="reference_type" value="4" />
   </node>
 
