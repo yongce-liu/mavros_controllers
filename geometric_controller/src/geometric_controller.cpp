@@ -79,6 +79,13 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh,
   statusloop_timer_ =
       nh_.createTimer(ros::Duration(1), &geometricCtrl::statusloopCallback,
                       this);  // Define timer for constant loop rate
+  hold_before_land_timer_ = nh_.createTimer(
+      ros::Duration(5.0),
+      [this](const ros::TimerEvent &) {
+        this->setFlightState(LANDING);
+        ROS_INFO("HOLD phase finished, switching to LAND");
+      },
+      true, false);
 
   angularVelPub_ =
       nh_.advertise<mavros_msgs::AttitudeTarget>("command/bodyrate_command", 1);
@@ -101,7 +108,8 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh,
   land_service_ =
       nh_.advertiseService("land", &geometricCtrl::landCallback, this);
   land_client = nh_.serviceClient<mavros_msgs::CommandTOL>("mavros/cmd/land");
-
+  hold_service_ =
+      nh_.advertiseService("hold", &geometricCtrl::holdCallback, this);
   mission_service_ =
       nh_.advertiseService("mission", &geometricCtrl::missionCallback, this);
   goto_service_ =
@@ -266,6 +274,7 @@ void geometricCtrl::mavtwistCallback(const geometry_msgs::TwistStamped &msg) {
 bool geometricCtrl::takeoffCallback(
     geometric_controller::Takeoff::Request &request,
     geometric_controller::Takeoff::Response &response) {
+  ros::spinOnce();
   arm_cmd_.request.value = true;
   if (!current_state_.armed) {
     if (arming_client_.call(arm_cmd_) && arm_cmd_.response.success) {
@@ -312,9 +321,22 @@ bool geometricCtrl::landCallback(
 
 bool geometricCtrl::landCallback(std_srvs::SetBool::Request &request,
                                  std_srvs::SetBool::Response &response) {
-  node_state = LANDING;
+  std_srvs::SetBool::Request hold_req;
+  std_srvs::SetBool::Response hold_res;
+  hold_req.data = true;
+  holdCallback(hold_req, hold_res);
+  hold_before_land_timer_.start();
   response.success = true;
-  response.message = "AUTO LANDING INITIALIZE";
+  response.message = "Entering HOLD first, will LAND after 5 seconds";
+  return true;
+}
+
+bool geometricCtrl::holdCallback(std_srvs::SetBool::Request &request,
+                                 std_srvs::SetBool::Response &response) {
+  last_hold_point_.x = mavPos_(0);
+  last_hold_point_.y = mavPos_(1);
+  last_hold_point_.z = mavPos_(2);
+  node_state = HOLD;
   return true;
 }
 

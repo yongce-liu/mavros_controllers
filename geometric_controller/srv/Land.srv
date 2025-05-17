@@ -1,4 +1,5 @@
 float32 height
+float32 duration
 ---
 bool success
 string message

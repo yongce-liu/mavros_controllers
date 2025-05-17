@@ -113,9 +113,9 @@ class geometricCtrl {
   ros::ServiceClient set_mode_client_;
   ros::ServiceServer ctrltriggerServ_;
   ros::ServiceServer takeoff_service_, land_service_, mission_service_,
-      goto_service_;
+      goto_service_, hold_service_;
   ros::ServiceClient takeoff_client_, land_client;
-  ros::Timer cmdloop_timer_, statusloop_timer_;
+  ros::Timer cmdloop_timer_, statusloop_timer_, hold_before_land_timer_;
   ros::Time last_request_, reference_request_now_, reference_request_last_;
 
   string mav_name_;
@@ -131,7 +131,7 @@ class geometricCtrl {
   double norm_thrust_const_, norm_thrust_offset_, norm_thrust_max_;
   double max_fb_acc_;
   double takeoff_height_ = 1.0;
-  double land_height_ = 0.2;
+  double land_height_ = 0.2, land_duration_ = 5.0;
   geometry_msgs::Point last_hold_point_;
 
   mavros_msgs::State current_state_;
@@ -179,6 +179,8 @@ class geometricCtrl {
                     std_srvs::SetBool::Response &response);
   bool takeoffCallback(geometric_controller::Takeoff::Request &request,
                        geometric_controller::Takeoff::Response &response);
+  bool holdCallback(std_srvs::SetBool::Request &request,
+                    std_srvs::SetBool::Response &response);
   bool missionCallback(std_srvs::SetBool::Request &request,
                        std_srvs::SetBool::Response &response);
   bool gotoCallback(std_srvs::SetBool::Request &request,
@@ -204,6 +206,7 @@ class geometricCtrl {
     MISSION_EXECUTION,
     LANDING
   } node_state;
+  void setFlightState(FlightState state) { node_state = state; };
 
   template <class T>
   void waitForPredicate(const T *pred, const std::string &msg,
