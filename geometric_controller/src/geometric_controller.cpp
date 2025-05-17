@@ -175,6 +175,7 @@ void geometricCtrl::targetCallback(const geometry_msgs::TwistStamped &msg) {
 }
 
 void geometricCtrl::flattargetCallback(const controller_msgs::FlatTarget &msg) {
+  received_target_pose = true;
   reference_request_last_ = reference_request_now_;
 
   targetPos_prev_ = targetPos_;
@@ -372,7 +373,7 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
 
     case MISSION_EXECUTION: {
       Eigen::Vector3d pos_error = mavPos_ - targetPos_;
-      if (pos_error.norm() > 1.0) {
+      if (pos_error.norm() > 2.1) {
         geometry_msgs::PoseStamped hold_pose;
         hold_pose.header.stamp = ros::Time::now();
         hold_pose.header.frame_id = "map";
