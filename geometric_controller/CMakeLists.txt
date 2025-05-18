@@ -12,16 +12,30 @@ find_package(catkin REQUIRED COMPONENTS
   mavros_extras
   mavros_msgs
   mavlink
+  message_generation 
+  controller_msgs
 )
 
 generate_dynamic_reconfigure_options(
   cfg/GeometricController.cfg
 )
 
+add_service_files(
+  FILES
+  Takeoff.srv
+  Land.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES geometric_controller
   CATKIN_DEPENDS roscpp rospy std_msgs mavros_msgs geometry_msgs sensor_msgs tf
+  message_runtime
 )
 
 #############

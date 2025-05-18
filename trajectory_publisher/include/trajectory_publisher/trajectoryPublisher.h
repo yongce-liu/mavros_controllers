@@ -39,12 +39,6 @@
 #ifndef TRAJECTORYPUBLISHER_H
 #define TRAJECTORYPUBLISHER_H
 
-#include <stdio.h>
-#include <Eigen/Dense>
-#include <cstdlib>
-#include <sstream>
-#include <string>
-
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <mavconn/mavlink_dialect.h>
@@ -56,6 +50,13 @@
 #include <std_msgs/Int32.h>
 #include <std_msgs/String.h>
 #include <std_srvs/SetBool.h>
+#include <stdio.h>
+
+#include <Eigen/Dense>
+#include <cstdlib>
+#include <sstream>
+#include <string>
+
 #include "controller_msgs/FlatTarget.h"
 #include "trajectory_publisher/polynomialtrajectory.h"
 #include "trajectory_publisher/shapetrajectory.h"
@@ -79,7 +80,7 @@ class trajectoryPublisher {
   ros::Subscriber motionselectorSub_;
   ros::Subscriber mavposeSub_;
   ros::Subscriber mavtwistSub_;
-  ros::Subscriber mavstate_sub_;
+  ros::Subscriber mavstateSub_;
   ros::ServiceServer trajtriggerServ_;
   ros::Timer trajloop_timer_;
   ros::Timer refloop_timer_;
@@ -98,7 +99,7 @@ class trajectoryPublisher {
   double controlUpdate_dt_;
   double primitive_duration_;
   double trigger_time_;
-  double init_pos_x_, init_pos_y_, init_pos_z_;
+  double init_height_;
   double max_jerk_;
   int pubreference_type_;
   int num_primitives_;
@@ -107,8 +108,13 @@ class trajectoryPublisher {
   std::vector<std::shared_ptr<trajectory>> motionPrimitives_;
   std::vector<Eigen::Vector3d> inputs_;
 
+  geometry_msgs::Pose home_pose_;
+
+  // string mav_name_;
+
  public:
-  trajectoryPublisher(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private);
+  trajectoryPublisher(const ros::NodeHandle& nh,
+                      const ros::NodeHandle& nh_private);
   void updateReference();
   void pubrefTrajectory(int selector);
   void pubprimitiveTrajectory();
@@ -120,7 +126,8 @@ class trajectoryPublisher {
   void updatePrimitives();
   void loopCallback(const ros::TimerEvent& event);
   void refCallback(const ros::TimerEvent& event);
-  bool triggerCallback(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool triggerCallback(std_srvs::SetBool::Request& req,
+                       std_srvs::SetBool::Response& res);
   void motionselectorCallback(const std_msgs::Int32& selector);
   void mavposeCallback(const geometry_msgs::PoseStamped& msg);
   void mavtwistCallback(const geometry_msgs::TwistStamped& msg);

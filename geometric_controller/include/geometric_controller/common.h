@@ -44,6 +44,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/TwistStamped.h>
+
 #include <Eigen/Dense>
 
 static Eigen::Matrix3d matrix_hat(const Eigen::Vector3d &v) {
@@ -65,24 +66,36 @@ inline Eigen::Vector3d toEigen(const geometry_msgs::Point &p) {
   return ev3;
 }
 
+inline geometry_msgs::Point toGeoPoint(const Eigen::Vector3d &p) {
+  geometry_msgs::Point ep;
+  ep.x = p(0);
+  ep.y = p(1);
+  ep.z = p(2);
+  return ep;
+}
+
 inline Eigen::Vector3d toEigen(const geometry_msgs::Vector3 &v3) {
   Eigen::Vector3d ev3(v3.x, v3.y, v3.z);
   return ev3;
 }
 
-inline Eigen::Vector4d quatMultiplication(const Eigen::Vector4d &q, const Eigen::Vector4d &p) {
+inline Eigen::Vector4d quatMultiplication(const Eigen::Vector4d &q,
+                                          const Eigen::Vector4d &p) {
   Eigen::Vector4d quat;
-  quat << p(0) * q(0) - p(1) * q(1) - p(2) * q(2) - p(3) * q(3), p(0) * q(1) + p(1) * q(0) - p(2) * q(3) + p(3) * q(2),
-      p(0) * q(2) + p(1) * q(3) + p(2) * q(0) - p(3) * q(1), p(0) * q(3) - p(1) * q(2) + p(2) * q(1) + p(3) * q(0);
+  quat << p(0) * q(0) - p(1) * q(1) - p(2) * q(2) - p(3) * q(3),
+      p(0) * q(1) + p(1) * q(0) - p(2) * q(3) + p(3) * q(2),
+      p(0) * q(2) + p(1) * q(3) + p(2) * q(0) - p(3) * q(1),
+      p(0) * q(3) - p(1) * q(2) + p(2) * q(1) + p(3) * q(0);
   return quat;
 }
 
 inline Eigen::Matrix3d quat2RotMatrix(const Eigen::Vector4d &q) {
   Eigen::Matrix3d rotmat;
-  rotmat << q(0) * q(0) + q(1) * q(1) - q(2) * q(2) - q(3) * q(3), 2 * q(1) * q(2) - 2 * q(0) * q(3),
-      2 * q(0) * q(2) + 2 * q(1) * q(3),
+  rotmat << q(0) * q(0) + q(1) * q(1) - q(2) * q(2) - q(3) * q(3),
+      2 * q(1) * q(2) - 2 * q(0) * q(3), 2 * q(0) * q(2) + 2 * q(1) * q(3),
 
-      2 * q(0) * q(3) + 2 * q(1) * q(2), q(0) * q(0) - q(1) * q(1) + q(2) * q(2) - q(3) * q(3),
+      2 * q(0) * q(3) + 2 * q(1) * q(2),
+      q(0) * q(0) - q(1) * q(1) + q(2) * q(2) - q(3) * q(3),
       2 * q(2) * q(3) - 2 * q(0) * q(1),
 
       2 * q(1) * q(3) - 2 * q(0) * q(2), 2 * q(0) * q(1) + 2 * q(2) * q(3),
