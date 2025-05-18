@@ -43,6 +43,26 @@ using namespace Eigen;
 trajectoryPublisher::trajectoryPublisher(const ros::NodeHandle& nh,
                                          const ros::NodeHandle& nh_private)
     : nh_(nh), nh_private_(nh_private), motion_selector_(0) {
+  // nh_private_.param<string>("mavname", mav_name_, "iris");
+  // nh_private_.param<double>("initpos_x", init_pos_x_, 0.0);
+  // nh_private_.param<double>("initpos_y", init_pos_y_, 0.0);
+  // nh_private_.param<double>("initpos_z", init_pos_z_, 1.0);
+  auto _tmp_msg =
+      ros::topic::waitForMessage<geometry_msgs::Pose>("home_pose", nh_);
+  if (_tmp_msg != nullptr) {
+    home_pose_ = *_tmp_msg;
+  } else {
+    ROS_ERROR("No home pose received");
+  }
+
+  nh_private_.param<double>("updaterate", controlUpdate_dt_, 0.01);
+  nh_private_.param<double>("horizon", primitive_duration_, 1.0);
+  nh_private_.param<double>("maxjerk", max_jerk_, 10.0);
+  nh_private_.param<double>("shape_omega", shape_omega_, 1.5);
+  nh_private_.param<int>("trajectory_type", trajectory_type_, 0);
+  nh_private_.param<int>("number_of_primitives", num_primitives_, 7);
+  nh_private_.param<int>("reference_type", pubreference_type_, 2);
+
   trajectoryPub_ =
       nh_.advertise<nav_msgs::Path>("trajectory_publisher/trajectory", 1);
   referencePub_ =
@@ -50,25 +70,22 @@ trajectoryPublisher::trajectoryPublisher(const ros::NodeHandle& nh,
   flatreferencePub_ =
       nh_.advertise<controller_msgs::FlatTarget>("reference/flatsetpoint", 1);
   rawreferencePub_ = nh_.advertise<mavros_msgs::PositionTarget>(
-      "mavros/setpoint_raw/local", 1);
+      "/mavros/setpoint_raw/local", 1);
   global_rawreferencePub_ = nh_.advertise<mavros_msgs::GlobalPositionTarget>(
-      "mavros/setpoint_raw/global", 1);
+      "/mavros/setpoint_raw/global", 1);
   motionselectorSub_ =
       nh_.subscribe("trajectory_publisher/motionselector", 1,
                     &trajectoryPublisher::motionselectorCallback, this,
                     ros::TransportHints().tcpNoDelay());
-  mavposeSub_ = nh_.subscribe("mavros/local_position/pose", 1,
+  mavposeSub_ = nh_.subscribe("/mavros/local_position/pose", 1,
                               &trajectoryPublisher::mavposeCallback, this,
                               ros::TransportHints().tcpNoDelay());
-  mavtwistSub_ = nh_.subscribe("mavros/local_position/velocity", 1,
+  mavtwistSub_ = nh_.subscribe("/mavros/local_position/velocity", 1,
                                &trajectoryPublisher::mavtwistCallback, this,
                                ros::TransportHints().tcpNoDelay());
   mavstateSub_ =
-      nh_.subscribe("mavros/state", 1, &trajectoryPublisher::mavstateCallback,
+      nh_.subscribe("/mavros/state", 1, &trajectoryPublisher::mavstateCallback,
                     this, ros::TransportHints().tcpNoDelay());
-  homePoseSub_ = nh_.subscribe(mav_name_ + "/home_pose", 1,
-                               &trajectoryPublisher::homePoseCallback, this,
-                               ros::TransportHints().tcpNoDelay());
 
   trajloop_timer_ = nh_.createTimer(ros::Duration(0.1),
                                     &trajectoryPublisher::loopCallback, this);
@@ -77,18 +94,6 @@ trajectoryPublisher::trajectoryPublisher(const ros::NodeHandle& nh,
 
   trajtriggerServ_ = nh_.advertiseService(
       "command/trajectory_start", &trajectoryPublisher::triggerCallback, this);
-
-  nh_private_.param<string>("mavname", mav_name_, "iris");
-  // nh_private_.param<double>("initpos_x", init_pos_x_, 0.0);
-  // nh_private_.param<double>("initpos_y", init_pos_y_, 0.0);
-  // nh_private_.param<double>("initpos_z", init_pos_z_, 1.0);
-  nh_private_.param<double>("updaterate", controlUpdate_dt_, 0.01);
-  nh_private_.param<double>("horizon", primitive_duration_, 1.0);
-  nh_private_.param<double>("maxjerk", max_jerk_, 10.0);
-  nh_private_.param<double>("shape_omega", shape_omega_, 1.5);
-  nh_private_.param<int>("trajectory_type", trajectory_type_, 0);
-  nh_private_.param<int>("number_of_primitives", num_primitives_, 7);
-  nh_private_.param<int>("reference_type", pubreference_type_, 2);
 
   inputs_.resize(num_primitives_);
 
@@ -309,12 +314,4 @@ void trajectoryPublisher::mavtwistCallback(
   v_mav_(1) = msg.twist.linear.y;
   v_mav_(2) = msg.twist.linear.z;
   updatePrimitives();
-}
-
-void trajectoryPublisher::homePoseCallback(
-    const geometry_msgs::PoseStamped& msg) {
-  if (!received_home_pose) {
-    home_pose_ = msg.pose;
-    received_home_pose = true;
-  }
 }

@@ -63,12 +63,12 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh,
                                     &geometricCtrl::multiDOFJointCallback, this,
                                     ros::TransportHints().tcpNoDelay());
   mavstateSub_ =
-      nh_.subscribe("mavros/state", 1, &geometricCtrl::mavstateCallback, this,
+      nh_.subscribe("/mavros/state", 1, &geometricCtrl::mavstateCallback, this,
                     ros::TransportHints().tcpNoDelay());
-  mavposeSub_ = nh_.subscribe("mavros/local_position/pose", 1,
+  mavposeSub_ = nh_.subscribe("/mavros/local_position/pose", 1,
                               &geometricCtrl::mavposeCallback, this,
                               ros::TransportHints().tcpNoDelay());
-  mavtwistSub_ = nh_.subscribe("mavros/local_position/velocity_local", 1,
+  mavtwistSub_ = nh_.subscribe("/mavros/local_position/velocity_local", 1,
                                &geometricCtrl::mavtwistCallback, this,
                                ros::TransportHints().tcpNoDelay());
   ctrltriggerServ_ = nh_.advertiseService(
@@ -92,24 +92,23 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh,
   referencePosePub_ =
       nh_.advertise<geometry_msgs::PoseStamped>("reference/pose", 1);
   target_pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>(
-      "mavros/setpoint_position/local", 10);
+      "/mavros/setpoint_position/local", 10);
   posehistoryPub_ =
       nh_.advertise<nav_msgs::Path>("geometric_controller/path", 10);
   systemstatusPub_ = nh_.advertise<mavros_msgs::CompanionProcessStatus>(
-      "mavros/companion_process/status", 1);
-  homePosePub_ = nh_.advertise<geometry_msgs::PoseStamped>(
-      mav_name_ + "/home_pose", 1, true);
+      "/mavros/companion_process/status", 1);
+  homePosePub_ = nh_.advertise<geometry_msgs::Pose>("home_pose", 10, true);
   arming_client_ =
-      nh_.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
+      nh_.serviceClient<mavros_msgs::CommandBool>("/mavros/cmd/arming");
   // set_mode_client_ =
-  // nh_.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
+  // nh_.serviceClient<mavros_msgs::SetMode>("/mavros/set_mode");
   takeoff_service_ =
       nh_.advertiseService("takeoff", &geometricCtrl::takeoffCallback, this);
   // takeoff_client_ =
   // nh_.serviceClient<mavros_msgs::CommandTOL>("/mavros/cmd/takeoff");
   land_service_ =
       nh_.advertiseService("land", &geometricCtrl::landCallback, this);
-  land_client = nh_.serviceClient<mavros_msgs::CommandTOL>("mavros/cmd/land");
+  land_client = nh_.serviceClient<mavros_msgs::CommandTOL>("/mavros/cmd/land");
   hold_service_ =
       nh_.advertiseService("hold", &geometricCtrl::holdCallback, this);
   mission_service_ =
@@ -119,7 +118,7 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh,
   trajectory_trigger_client_ =
       nh_.serviceClient<std_srvs::SetBool>("command/trajectory_start");
 
-  nh_private_.param<string>("mavname", mav_name_, "iris");
+  // nh_private_.param<string>("mavname", mav_name_, "iris");
   nh_private_.param<int>("ctrl_mode", ctrl_mode_, ERROR_QUATERNION);
   // nh_private_.param<bool>("enable_sim", sim_enable_, true);
   nh_private_.param<bool>("velocity_yaw", velocity_yaw_, false);
@@ -146,12 +145,13 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh,
   nh_private_.param<double>("Kv_y", Kvel_y_, 1.5);
   nh_private_.param<double>("Kv_z", Kvel_z_, 3.3);
   nh_private_.param<int>("posehistory_window", posehistory_window_, 200);
-  nh_private_.param<double>("init_pos_x", initTargetPos_x_, 0.0);
-  nh_private_.param<double>("init_pos_y", initTargetPos_y_, 0.0);
-  nh_private_.param<double>("init_pos_z", initTargetPos_z_, 1.0);
+  // nh_private_.param<double>("init_pos_x", initTargetPos_x_, 0.0);
+  // nh_private_.param<double>("init_pos_y", initTargetPos_y_, 0.0);
+  // nh_private_.param<double>("init_pos_z", initTargetPos_z_, 1.0);
 
-  targetPos_ << initTargetPos_x_, initTargetPos_y_,
-      initTargetPos_z_;  // Initial Position
+  // targetPos_ << initTargetPos_x_, initTargetPos_y_,
+  // initTargetPos_z_;  // Initial Position
+  targetPos_ << 0.0, 0.0, 0.0;  // Initial Position
   targetVel_ << 0.0, 0.0, 0.0;
   mavPos_ << 0.0, 0.0, 0.0;
   mavVel_ << 0.0, 0.0, 0.0;
@@ -270,6 +270,7 @@ void geometricCtrl::mavposeCallback(const geometry_msgs::PoseStamped &msg) {
     received_home_pose = true;
     home_pose_ = msg.pose;
     ROS_INFO_STREAM("Home pose initialized to: " << home_pose_);
+    homePosePub_.publish(home_pose_);
   }
   mavPos_ = toEigen(msg.pose.position);
   mavAtt_(0) = msg.pose.orientation.w;
@@ -425,7 +426,6 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
     case WAITING_FOR_HOME_POSE: {
       waitForPredicate(&received_home_pose, "Waiting for home pose...");
       ROS_INFO("Got pose! Drone Ready to be armed.");
-      homePosePub_.publish(home_pose_);
       last_hold_point_ = toEigen(home_pose_.position);
       node_state = HOLD;
       break;

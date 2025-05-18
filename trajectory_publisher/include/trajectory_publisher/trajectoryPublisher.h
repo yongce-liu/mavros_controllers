@@ -81,7 +81,6 @@ class trajectoryPublisher {
   ros::Subscriber mavposeSub_;
   ros::Subscriber mavtwistSub_;
   ros::Subscriber mavstateSub_;
-  ros::Subscriber homePoseSub_;
   ros::ServiceServer trajtriggerServ_;
   ros::Timer trajloop_timer_;
   ros::Timer refloop_timer_;
@@ -110,9 +109,8 @@ class trajectoryPublisher {
   std::vector<Eigen::Vector3d> inputs_;
 
   geometry_msgs::Pose home_pose_;
-  bool received_home_pose{false};
 
-  string mav_name_;
+  // string mav_name_;
 
  public:
   trajectoryPublisher(const ros::NodeHandle& nh,
@@ -134,7 +132,6 @@ class trajectoryPublisher {
   void mavposeCallback(const geometry_msgs::PoseStamped& msg);
   void mavtwistCallback(const geometry_msgs::TwistStamped& msg);
   void mavstateCallback(const mavros_msgs::State::ConstPtr& msg);
-  void homePoseCallback(const geometry_msgs::PoseStamped& msg);
 };
 
 #endif
