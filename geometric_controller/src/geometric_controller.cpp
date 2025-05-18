@@ -97,6 +97,8 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh,
       nh_.advertise<nav_msgs::Path>("geometric_controller/path", 10);
   systemstatusPub_ = nh_.advertise<mavros_msgs::CompanionProcessStatus>(
       "mavros/companion_process/status", 1);
+  homePosePub_ = nh_.advertise<geometry_msgs::PoseStamped>(
+      mav_name_ + "/home_pose", 1, true);
   arming_client_ =
       nh_.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
   // set_mode_client_ =
@@ -114,6 +116,8 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh,
       nh_.advertiseService("mission", &geometricCtrl::missionCallback, this);
   goto_service_ =
       nh_.advertiseService("goto", &geometricCtrl::gotoCallback, this);
+  trajectory_trigger_client_ =
+      nh_.serviceClient<std_srvs::SetBool>("command/trajectory_start");
 
   nh_private_.param<string>("mavname", mav_name_, "iris");
   nh_private_.param<int>("ctrl_mode", ctrl_mode_, ERROR_QUATERNION);
@@ -164,6 +168,14 @@ geometricCtrl::geometricCtrl(const ros::NodeHandle &nh,
 }
 geometricCtrl::~geometricCtrl() {
   // Destructor
+}
+
+void geometricCtrl::pubHoldPose(const Vector3d &hold_point) {
+  geometry_msgs::PoseStamped hold_pose;
+  hold_pose.header.stamp = ros::Time::now();
+  hold_pose.header.frame_id = "map";
+  hold_pose.pose.position = toGeoPoint(hold_point);
+  target_pose_pub_.publish(hold_pose);
 }
 
 void geometricCtrl::targetCallback(const geometry_msgs::TwistStamped &msg) {
@@ -309,9 +321,7 @@ bool geometricCtrl::landCallback(
     geometric_controller::Takeoff::Response &response) {
   land_height_ =
       std::max(0.05, std::min(0.3, static_cast<double>(request.height)));
-  last_hold_point_.x = mavPos_(0);
-  last_hold_point_.y = mavPos_(1);
-  last_hold_point_.z = mavPos_(2);
+  last_hold_point_ = mavPos_;
   node_state = LANDING;
   response.success = true;
   response.message = "Landing initiated";
@@ -333,45 +343,62 @@ bool geometricCtrl::landCallback(std_srvs::SetBool::Request &request,
 
 bool geometricCtrl::holdCallback(std_srvs::SetBool::Request &request,
                                  std_srvs::SetBool::Response &response) {
-  last_hold_point_.x = mavPos_(0);
-  last_hold_point_.y = mavPos_(1);
-  last_hold_point_.z = mavPos_(2);
+  last_hold_point_ = mavPos_;
   node_state = HOLD;
   return true;
 }
 
 bool geometricCtrl::missionCallback(std_srvs::SetBool::Request &request,
                                     std_srvs::SetBool::Response &response) {
+  last_hold_point_ = mavPos_;
   if (!received_target_pose) {
     ROS_ERROR("No target pose received yet");
     response.success = false;
     response.message = "No target pose received yet";
-    return true;
+    return false;
   }
 
   else {
+    std_srvs::SetBool srv;
+    srv.request.data = true;
+    if (!trajectory_trigger_client_.call(srv)) {
+      ROS_ERROR("Failed to trigger trajectory");
+      response.success = false;
+      response.message = "Failed to trigger trajectory";
+      return false;
+    }
     node_state = MISSION_EXECUTION;
     response.success = true;
-    response.message = "Mission execution started";
-    return true;
+    response.message = "Trigger trajectory && Mission execution started";
   }
+  return true;
 }
 
 bool geometricCtrl::gotoCallback(std_srvs::SetBool::Request &request,
                                  std_srvs::SetBool::Response &response) {
+  last_hold_point_ = mavPos_;
   if (!received_target_pose) {
     ROS_ERROR("No target pose received yet");
     response.success = false;
     response.message = "No target pose received yet";
-    return true;
+    return false;
   }
 
   else {
+    std_srvs::SetBool srv;
+    srv.request.data = true;
+    if (!trajectory_trigger_client_.call(srv)) {
+      ROS_ERROR("Failed to trigger trajectory");
+      response.success = false;
+      response.message = "Failed to trigger trajectory";
+      return false;
+    }
+    last_hold_point_ = mavPos_;
     node_state = GOTO;
     response.success = true;
-    response.message = "GOTO execution started";
-    return true;
+    response.message = "Trigger trajectory && GOTO execution started";
   }
+  return true;
 }
 
 void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
@@ -387,8 +414,8 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
       double current_z = mavPos_(2);
       double dz = std::abs(current_z - target_z);
       if (dz < 0.05) {
-        last_hold_point_ = home_pose_.position;
-        last_hold_point_.z = target_z;
+        last_hold_point_ = toEigen(home_pose_.position);
+        last_hold_point_(2) = target_z;
         node_state = HOLD;
         ROS_INFO("Takeoff complete, switching to HOLD");
       }
@@ -398,40 +425,39 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
     case WAITING_FOR_HOME_POSE: {
       waitForPredicate(&received_home_pose, "Waiting for home pose...");
       ROS_INFO("Got pose! Drone Ready to be armed.");
-      last_hold_point_ = home_pose_.position;
+      homePosePub_.publish(home_pose_);
+      last_hold_point_ = toEigen(home_pose_.position);
       node_state = HOLD;
       break;
     }
 
     case HOLD: {
-      geometry_msgs::PoseStamped hold_pose;
-      hold_pose.header.stamp = ros::Time::now();
-      hold_pose.header.frame_id = "map";
-      hold_pose.pose.position = last_hold_point_;
-      target_pose_pub_.publish(hold_pose);
+      pubHoldPose(last_hold_point_);
       break;
     }
 
     case GOTO: {
-      geometry_msgs::PoseStamped goto_pose;
-      goto_pose.header.stamp = ros::Time::now();
-      goto_pose.header.frame_id = "map";
-      goto_pose.pose.position.x = targetPos_(0);
-      goto_pose.pose.position.y = targetPos_(1);
-      goto_pose.pose.position.z = targetPos_(2);
-      target_pose_pub_.publish(goto_pose);
+      Eigen::Vector3d pos_error = mavPos_ - targetPos_;
+      if (pos_error.norm() > 1.1) {
+        ROS_WARN("Target position too far, holding at last position");
+        geometry_msgs::PoseStamped hold_pose;
+        pubHoldPose(last_hold_point_);
+      } else {
+        geometry_msgs::PoseStamped goto_pose;
+        goto_pose.header.stamp = ros::Time::now();
+        goto_pose.header.frame_id = "map";
+        goto_pose.pose.position = toGeoPoint(targetPos_);
+        target_pose_pub_.publish(goto_pose);
+      }
       break;
     }
 
     case MISSION_EXECUTION: {
       Eigen::Vector3d pos_error = mavPos_ - targetPos_;
-      if (pos_error.norm() > 2.1) {
-        geometry_msgs::PoseStamped hold_pose;
-        hold_pose.header.stamp = ros::Time::now();
-        hold_pose.header.frame_id = "map";
-        hold_pose.pose.position = last_hold_point_;
-        target_pose_pub_.publish(hold_pose);
+      if (pos_error.norm() > 1.1) {
         ROS_WARN("Target position too far, holding at last position");
+        pubHoldPose(last_hold_point_);
+        node_state = HOLD;
       } else {
         Eigen::Vector3d desired_acc;
         if (feedthrough_enable_) {

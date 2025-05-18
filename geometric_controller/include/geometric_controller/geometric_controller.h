@@ -109,12 +109,13 @@ class geometricCtrl {
   ros::Publisher referencePosePub_;
   ros::Publisher posehistoryPub_;
   ros::Publisher systemstatusPub_;
+  ros::Publisher homePosePub_;
   ros::ServiceClient arming_client_;
   ros::ServiceClient set_mode_client_;
   ros::ServiceServer ctrltriggerServ_;
   ros::ServiceServer takeoff_service_, land_service_, mission_service_,
       goto_service_, hold_service_;
-  ros::ServiceClient takeoff_client_, land_client;
+  ros::ServiceClient takeoff_client_, land_client, trajectory_trigger_client_;
   ros::Timer cmdloop_timer_, statusloop_timer_, hold_before_land_timer_;
   ros::Time last_request_, reference_request_now_, reference_request_last_;
 
@@ -132,7 +133,8 @@ class geometricCtrl {
   double max_fb_acc_;
   double takeoff_height_ = 1.0;
   double land_height_ = 0.2, land_duration_ = 5.0;
-  geometry_msgs::Point last_hold_point_;
+  // geometry_msgs::Point last_hold_point_;
+  Vector3d last_hold_point_;
 
   mavros_msgs::State current_state_;
   mavros_msgs::CommandBool arm_cmd_;
@@ -151,6 +153,7 @@ class geometricCtrl {
   double Kpos_x_, Kpos_y_, Kpos_z_, Kvel_x_, Kvel_y_, Kvel_z_;
   int posehistory_window_;
 
+  void pubHoldPose(const Vector3d &hold_point);
   void pubMotorCommands();
   void pubRateCommands(const Eigen::Vector4d &cmd,
                        const Eigen::Vector4d &target_attitude);

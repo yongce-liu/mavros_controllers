@@ -31,6 +31,7 @@
   </node>
 
   <node pkg="trajectory_publisher" type="trajectory_publisher" name="trajectory_publisher" output="screen">
+        <param name="mav_name" type="string" value="$(arg mav_name)" />
         <param name="trajectory_type" value="1" />
         <param name="shape_omega" value="0.5" />
         <param name="initpos_z" value="1.0" />
