@@ -440,7 +440,6 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
       Eigen::Vector3d pos_error = mavPos_ - targetPos_;
       if (pos_error.norm() > 1.1) {
         ROS_WARN("Target position too far, holding at last position");
-        geometry_msgs::PoseStamped hold_pose;
         pubHoldPose(last_hold_point_);
       } else {
         geometry_msgs::PoseStamped goto_pose;
@@ -457,7 +456,6 @@ void geometricCtrl::cmdloopCallback(const ros::TimerEvent &event) {
       if (pos_error.norm() > 1.1) {
         ROS_WARN("Target position too far, holding at last position");
         pubHoldPose(last_hold_point_);
-        node_state = HOLD;
       } else {
         Eigen::Vector3d desired_acc;
         if (feedthrough_enable_) {

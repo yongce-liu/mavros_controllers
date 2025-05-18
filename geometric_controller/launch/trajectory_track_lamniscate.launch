@@ -27,7 +27,7 @@
   </node>
 
   <node pkg="trajectory_publisher" type="trajectory_publisher" name="trajectory_publisher" ns="$(arg mav_name)" output="screen">
-        <param name="trajectory_type" value="1" />
+        <param name="trajectory_type" value="2" />
         <param name="height" value="1.0" />
         <param name="shape_omega" value="0.5" />
         <param name="reference_type" value="4" />

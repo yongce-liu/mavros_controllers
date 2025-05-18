@@ -99,7 +99,7 @@ class trajectoryPublisher {
   double controlUpdate_dt_;
   double primitive_duration_;
   double trigger_time_;
-  // double init_pos_x_, init_pos_y_, init_pos_z_;
+  double init_height_;
   double max_jerk_;
   int pubreference_type_;
   int num_primitives_;

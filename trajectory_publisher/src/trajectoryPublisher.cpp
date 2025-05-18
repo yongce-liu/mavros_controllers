@@ -43,10 +43,7 @@ using namespace Eigen;
 trajectoryPublisher::trajectoryPublisher(const ros::NodeHandle& nh,
                                          const ros::NodeHandle& nh_private)
     : nh_(nh), nh_private_(nh_private), motion_selector_(0) {
-  // nh_private_.param<string>("mavname", mav_name_, "iris");
-  // nh_private_.param<double>("initpos_x", init_pos_x_, 0.0);
-  // nh_private_.param<double>("initpos_y", init_pos_y_, 0.0);
-  // nh_private_.param<double>("initpos_z", init_pos_z_, 1.0);
+  /////////////////////// WAITING FOR HOME POSE
   auto _tmp_msg =
       ros::topic::waitForMessage<geometry_msgs::Pose>("home_pose", nh_);
   if (_tmp_msg != nullptr) {
@@ -54,7 +51,9 @@ trajectoryPublisher::trajectoryPublisher(const ros::NodeHandle& nh,
   } else {
     ROS_ERROR("No home pose received");
   }
+  /////////////////////// WAITING FOR HOME POSE
 
+  nh_private_.param<double>("height", init_height_, 1.0);
   nh_private_.param<double>("updaterate", controlUpdate_dt_, 0.01);
   nh_private_.param<double>("horizon", primitive_duration_, 1.0);
   nh_private_.param<double>("maxjerk", max_jerk_, 10.0);
@@ -126,11 +125,11 @@ trajectoryPublisher::trajectoryPublisher(const ros::NodeHandle& nh,
   }
 
   // p_targ << init_pos_x_, init_pos_y_, init_pos_z_;
-  p_targ << home_pose_.position.x, home_pose_.position.y, home_pose_.position.z;
+  p_targ << home_pose_.position.x, home_pose_.position.y,
+      home_pose_.position.z + init_height_;
   v_targ << 0.0, 0.0, 0.0;
-  // shape_origin_ << init_pos_x_, init_pos_y_, init_pos_z_;
-  shape_origin_ << home_pose_.position.x, home_pose_.position.y,
-      home_pose_.position.z;
+  shape_origin_ << home_pose_.position.x - 1.0, home_pose_.position.y,
+      home_pose_.position.z + init_height_;
   shape_axis_ << 0.0, 0.0, 1.0;
   motion_selector_ = 0;
 
@@ -139,10 +138,6 @@ trajectoryPublisher::trajectoryPublisher(const ros::NodeHandle& nh,
 
 void trajectoryPublisher::updateReference() {
   curr_time_ = ros::Time::now();
-  // if (current_state_.mode !=
-  //     "OFFBOARD") {  /// Reset start_time_ when not in offboard
-  //   start_time_ = ros::Time::now();
-  // }
   trigger_time_ = (curr_time_ - start_time_).toSec();
 
   p_targ = motionPrimitives_.at(motion_selector_)->getPosition(trigger_time_);
