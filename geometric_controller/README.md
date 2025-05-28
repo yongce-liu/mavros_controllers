@@ -9,7 +9,7 @@ Trajectory trackking controller using [mavros](https://github.com/mavlink/mavros
 
 ## Parameters
 - /geometric_controller/mavname (default: "iris")
-- /geometric_controller/ctrl_mode (default: MODE_BODYRATE)
+- /geometric_controller/ctrl_mode (default: ERROR_QUATERNION (0))
 - /geometric_controller/enable_sim (default: true)
 - /geometric_controller/enable_gazebo_state (default: false)
 - /geometric_controller/max_acc (default: 7.0)
@@ -30,7 +30,7 @@ The geometric controller publishes and subscribes the following topics.
 	- reference/pose ( [geometry_msgs/PoseStamped](http://docs.ros.org/kinetic/api/geometry_msgs/html/msg/PoseStamped.html) )
 
 - Subscribed Topics
-	- reference/setpoint ( [geometry_msgs/TwistStamped](http://docs.ros.org/api/geometry_msgs/html/msg/TwistStamped.html) )
+	- reference/setpoint ( [geometry_msgs/TwistStamped](http://docs.ros.org/api/geometry_msgs/html/msg/TwistStamped.html) ) 
 	- /mavros/state ( [mavr0s_msgs/State](http://docs.ros.org/api/mavros_msgs/html/msg/State.html) )
 	- /mavros/local_position/pose ( [geometry_msgs/PoseStamped](http://docs.ros.org/kinetic/api/geometry_msgs/html/msg/PoseStamped.html) )
 	- /gazebo/model_states( [gazebo_msgs/ModelStates](http://docs.ros.org/kinetic/api/gazebo_msgs/html/msg/ModelState.html) )

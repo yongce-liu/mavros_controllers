@@ -33,7 +33,7 @@
         <param name="trajectory_type" value="2" />
         <param name="height" value="1.0" />
         <param name="shape_omega" value="0.5" />
-        <param name="reference_type" value="4" />
+        <param name="reference_type" value="0" />
   </node>
 
   <!-- Launch rqt_reconfigure -->

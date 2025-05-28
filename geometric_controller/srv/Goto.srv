@@ -1,0 +1,4 @@
+geometry_msgs/Point target_point
+---
+bool success
+string message
