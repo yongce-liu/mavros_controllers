@@ -24,11 +24,13 @@ add_service_files(
   FILES
   Takeoff.srv
   Land.srv
+  Goto.srv
 )
 
 generate_messages(
   DEPENDENCIES
   std_msgs
+  geometry_msgs
 )
 
 catkin_package(

@@ -126,6 +126,7 @@ Eigen::VectorXd polynomialtrajectory::getCoefficients(int dim) {
     case 2:
       return c_z_;
   }
+  return Eigen::VectorXd::Zero(0);
 }
 
 Eigen::Vector3d polynomialtrajectory::getPosition(double time) {

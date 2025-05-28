@@ -45,14 +45,13 @@
 #include "geometric_controller/control.h"
 
 class NonlinearAttitudeControl : public Control {
- public:
-  NonlinearAttitudeControl(double attctrl_tau);
-  virtual ~NonlinearAttitudeControl();
-  void Update(Eigen::Vector4d &curr_att, const Eigen::Vector4d &ref_att, const Eigen::Vector3d &ref_acc,
-              const Eigen::Vector3d &ref_jerk) override;
+  public:
+    NonlinearAttitudeControl(double attctrl_tau);
+    virtual ~NonlinearAttitudeControl();
+    void Update(Eigen::Vector4d& curr_att, const Eigen::Vector4d& ref_att, const Eigen::Vector3d& ref_acc, const Eigen::Vector3d& ref_jerk) override;
 
- private:
-  double attctrl_tau_{1.0};
+  private:
+    double attctrl_tau_{1.0};
 };
 
 #endif
