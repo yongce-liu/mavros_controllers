@@ -1,0 +1,70 @@
+###############################################################################
+# mavros_controllers – ROS Noetic + PX4 SITL + Gazebo 11
+#
+# Usage:
+#   docker compose build
+#   docker compose up sim          # PX4 SITL + Gazebo + MAVROS
+#   docker compose run dev bash    # interactive development shell
+#
+# For GUI (Gazebo/RViz) on Linux, run before launching:
+#   xhost +local:docker
+###############################################################################
+version: "3.8"
+
+services:
+  # ── Build stage (shared image) ─────────────────────────────────────────────
+  sim:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mavros_controllers:noetic
+    container_name: mavros_sim
+    privileged: true
+    network_mode: host
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      # PX4 SITL defaults
+      - PX4_HOME_LAT=47.397742
+      - PX4_HOME_LON=8.545594
+      - PX4_HOME_ALT=488.0
+    volumes:
+      # X11 forwarding for Gazebo / RViz GUI
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # GPU acceleration (NVIDIA)
+      - /dev/dri:/dev/dri
+      # Mount source for live editing (optional – comment out for production)
+      - ./controller_msgs:/root/catkin_ws/src/mavros_controllers/controller_msgs
+      - ./geometric_controller:/root/catkin_ws/src/mavros_controllers/geometric_controller
+      - ./trajectory_publisher:/root/catkin_ws/src/mavros_controllers/trajectory_publisher
+      - ./mavros_controllers:/root/catkin_ws/src/mavros_controllers/mavros_controllers
+    # Launch PX4 SITL + Gazebo + MAVROS
+    command: >
+      bash -c "
+        roslaunch px4 mavros_posix_sitl.launch
+      "
+    stdin_open: true
+    tty: true
+
+  # ── Development shell ──────────────────────────────────────────────────────
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mavros_controllers:noetic
+    container_name: mavros_dev
+    privileged: true
+    network_mode: host
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /dev/dri:/dev/dri
+      - ./controller_msgs:/root/catkin_ws/src/mavros_controllers/controller_msgs
+      - ./geometric_controller:/root/catkin_ws/src/mavros_controllers/geometric_controller
+      - ./trajectory_publisher:/root/catkin_ws/src/mavros_controllers/trajectory_publisher
+      - ./mavros_controllers:/root/catkin_ws/src/mavros_controllers/mavros_controllers
+    command: bash
+    stdin_open: true
+    tty: true
