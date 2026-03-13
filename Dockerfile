@@ -54,7 +54,7 @@ RUN cd catkin_ws && \
     source /opt/ros/noetic/setup.bash && \
     catkin_make -DCMAKE_BUILD_TYPE=Release
 
-RUN cat <<EOF >> ~/.bashrc
+RUN cat <<EOF >> /root/.bashrc
 source /opt/ros/noetic/setup.bash
 source /ros_ws/devel/setup.bash
 source /catkin_ws/devel/setup.bash
