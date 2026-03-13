@@ -55,12 +55,13 @@ RUN cd catkin_ws && \
     catkin_make -DCMAKE_BUILD_TYPE=Release
 
 RUN cat <<EOF >> ~/.bashrc
-source /PX4-Autopilot/Tools/simulation/gazebo-classic/setup_gazebo.bash /PX4-Autopilot /PX4-Autopilot/build/px4_sitl_default
-export ROS_PACKAGE_PATH=\$ROS_PACKAGE_PATH:/PX4-Autopilot/Tools/simulation/gazebo-classic/sitl_gazebo-classic
-export PATH=$PATH:/PX4-Autopilot/build/px4_sitl_default/bin
 source /opt/ros/noetic/setup.bash
 source /ros_ws/devel/setup.bash
 source /catkin_ws/devel/setup.bash
+source /PX4-Autopilot/Tools/simulation/gazebo-classic/setup_gazebo.bash /PX4-Autopilot /PX4-Autopilot/build/px4_sitl_default
+export ROS_PACKAGE_PATH=$ROS_PACKAGE_PATH:/PX4-Autopilot
+export ROS_PACKAGE_PATH=$ROS_PACKAGE_PATH:/PX4-Autopilot/Tools/simulation/gazebo-classic/sitl_gazebo-classic
+export PATH=$PATH:/PX4-Autopilot/build/px4_sitl_default/bin
 EOF
 
 CMD ["/bin/bash"]
