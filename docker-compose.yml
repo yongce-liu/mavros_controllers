@@ -10,19 +10,8 @@ services:
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
     volumes:
-      # X11 forwarding for Gazebo / RViz GUI
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      # GPU acceleration (NVIDIA)
       - /dev/dri:/dev/dri
-      # Mount source for live editing (optional – comment out for production)
-      - ./src:/root/catkin_ws/src/mavros_controllers/controller_msgs
-      - ./geometric_controller:/root/catkin_ws/src/mavros_controllers/geometric_controller
-      - ./trajectory_publisher:/root/catkin_ws/src/mavros_controllers/trajectory_publisher
-      - ./mavros_controllers:/root/catkin_ws/src/mavros_controllers/mavros_controllers
-    # Launch PX4 SITL + Gazebo + MAVROS
-    command: >
-      bash -c "
-        roslaunch px4 mavros_posix_sitl.launch
-      "
+      - ./src:/root/catkin_ws/src:ro
     stdin_open: true
     tty: true
