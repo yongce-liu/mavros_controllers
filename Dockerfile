@@ -9,6 +9,7 @@ RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.l
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    git \
     lsb-release \
     ros-noetic-mavros \
     ros-noetic-mavros-extras \
@@ -37,6 +38,7 @@ RUN bash PX4-Autopilot/Tools/setup/ubuntu.sh --no-sim-tools
 RUN cd PX4-Autopilot && \
     DONT_RUN=1 make px4_sitl_default gazebo-classic
 
+SHELL ["/bin/bash", "-c"]
 RUN mkdir -p catkin_ws && \
     mkdir -p ros_ws/src && \
     cd ros_ws/src && \
@@ -53,11 +55,12 @@ RUN cd catkin_ws && \
     catkin_make -DCMAKE_BUILD_TYPE=Release
 
 RUN cat <<EOF >> ~/.bashrc
+source /PX4-Autopilot/Tools/simulation/gazebo-classic/setup_gazebo.bash /PX4-Autopilot /PX4-Autopilot/build/px4_sitl_default
+export ROS_PACKAGE_PATH=\$ROS_PACKAGE_PATH:/PX4-Autopilot/Tools/simulation/gazebo-classic/sitl_gazebo-classic
+export PATH=$PATH:/PX4-Autopilot/build/px4_sitl_default/bin
 source /opt/ros/noetic/setup.bash
 source /ros_ws/devel/setup.bash
 source /catkin_ws/devel/setup.bash
-source /PX4-Autopilot/Tools/simulation/gazebo-classic/setup_gazebo.bash /PX4-Autopilot /PX4-Autopilot/build/px4_sitl_default
-export ROS_PACKAGE_PATH=\$ROS_PACKAGE_PATH:/PX4-Autopilot/Tools/simulation/gazebo-classic/sitl_gazebo-classic
 EOF
 
 CMD ["/bin/bash"]
